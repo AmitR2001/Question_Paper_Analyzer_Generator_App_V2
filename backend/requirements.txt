@@ -1,0 +1,8 @@
+flask
+flask-cors
+google-generativeai
+google-genai
+openai
+PyMuPDF
+python-dotenv
+requests
