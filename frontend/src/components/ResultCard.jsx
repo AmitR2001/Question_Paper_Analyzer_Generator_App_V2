@@ -6,7 +6,6 @@ const ResultCard = ({ result, studentResponseData = null }) => {
   const [theme, setTheme] = useState('light');
   const [showDetails, setShowDetails] = useState(false);
   const [viewMode, setViewMode] = useState('standard'); // 'standard' or 'metrics'
-  const [selectedChartMetric, setSelectedChartMetric] = useState('difficulty_score');
 
   // Move all hooks to the top, before any early returns
   const difficulty = useMemo(() => {
@@ -76,16 +75,16 @@ const ResultCard = ({ result, studentResponseData = null }) => {
       return [result.metrics];
     }
     
-    // Fallback for legacy format - create mock metrics for demonstration
+    // For legacy format - create a single data point from the analysis
+    const normalizedDifficulty = difficulty.charAt(0).toUpperCase() + difficulty.slice(1).toLowerCase();
+    
     return [{
-      difficulty_label: difficulty || 'Moderate',
-      difficulty_score: score || 6.5,
-      syllabus_alignment_score: score || 8.5,
+      difficulty_label: normalizedDifficulty,
+      difficulty_score: score || 5.0,
+      syllabus_alignment_score: score || 7.0,
       cognitive_level: 'Apply',
-      application_depth: 3,
-      estimated_time_to_solve: '15 minutes',
-      complexity_index: 7.2,
-      explanation: 'This question requires application of concepts with moderate complexity.',
+      complexity_index: score || 6.0,
+      explanation: result.analysis || result,
       ai_model_used: result?.ai_model || 'AI Analysis',
       question_id: 'Q1'
     }];
@@ -94,124 +93,38 @@ const ResultCard = ({ result, studentResponseData = null }) => {
   // Early return after all hooks
   if (!result) return null;
 
-  const getMetricInterpretation = (metric, value) => {
-    switch (metric) {
-      case 'difficulty_score':
-        if (value <= 3) return { level: 'Easy', color: 'success', icon: '' };
-        if (value <= 7) return { level: 'Moderate', color: 'warning', icon: '' };
-        return { level: 'Hard', color: 'danger', icon: '' };
-      
-      case 'application_depth':
-        if (value <= 2) return { level: 'Basic', color: 'success', icon: '' };
-        if (value <= 3) return { level: 'Intermediate', color: 'warning', icon: '' };
-        return { level: 'Advanced', color: 'danger', icon: '' };
-      
-      case 'complexity_index':
-        if (value <= 4) return { level: 'Simple', color: 'success', icon: '' };
-        if (value <= 7) return { level: 'Moderate', color: 'warning', icon: '' };
-        return { level: 'Complex', color: 'danger', icon: '' };
-      
-      case 'syllabus_alignment_score':
-        if (value >= 8) return { level: 'Excellent', color: 'success', icon: '' };
-        if (value >= 6) return { level: 'Good', color: 'warning', icon: '' };
-        return { level: 'Poor', color: 'danger', icon: '' };
-      
-      default:
-        return { level: 'Unknown', color: 'neutral', icon: '❓' };
-    }
-  };
-
-  // Simple chart component for visualization
-  const MetricsChart = ({ data, type }) => {
+  // Simple bar chart component
+  const BarChart = ({ data, title, metric, color = 'primary' }) => {
     if (!data || data.length === 0) return null;
     
-    const getChartData = () => {
-      switch (type) {
-        case 'difficulty_score':
-          return { title: '📊 Difficulty Score', max: 10, unit: '', color: 'primary' };
-        case 'application_depth':
-          return { title: '🎯 Application Depth', max: 5, unit: '', color: 'success' };
-        case 'complexity_index':
-          return { title: '🧠 Complexity Index', max: 10, unit: '', color: 'warning' };
-        case 'syllabus_alignment_score':
-          return { title: '📚 Syllabus Alignment', max: 10, unit: '', color: 'info' };
-        default:
-          return { title: 'Unknown Metric', max: 10, unit: '', color: 'neutral' };
-      }
-    };
-
-    const chartData = getChartData();
-    
-    // Get average interpretation for legend
-    const avgValue = data.reduce((sum, item) => sum + (item[type] || 0), 0) / data.length;
-    const avgInterpretation = getMetricInterpretation(type, avgValue);
+    // Get the actual values for the specific metric
+    const values = data.map(item => item[metric] || 0);
+    const maxValue = Math.max(...values, 10); // Ensure minimum scale of 10
     
     return (
-      <div className="metrics-chart">
+      <div className="bar-chart">
         <div className="chart-header">
-          <h4 className="chart-title">{chartData.title}</h4>
+          <h4 className="chart-title">{title}</h4>
         </div>
-        <div className="chart-container">
+        <div className="bar-chart-container">
           {data.map((item, index) => {
-            const value = item[type] || 0;
-            const height = (value / chartData.max) * 100;
-            const interpretation = getMetricInterpretation(type, value);
+            const value = item[metric] || 0; // Get the actual value for this specific question
+            const height = maxValue > 0 ? (value / maxValue) * 100 : 0;
             
             return (
-              <div key={index} className="chart-bar-container">
-                <div className="chart-bar-wrapper">
+              <div key={index} className="bar-item">
+                <div className="bar-wrapper">
                   <div 
-                    className={`chart-bar ${interpretation.color}`}
-                    style={{ height: `${Math.max(height, 10)}%` }}
-                    title={`${chartData.title}: ${value}${chartData.unit}`}
+                    className={`bar ${color}`}
+                    style={{ height: `${Math.max(height, 5)}%` }}
+                    title={`${title}: ${value}`}
                   >
-                    <span className="bar-value">{value}{chartData.unit}</span>
+                    <span className="bar-value">{value}</span>
                   </div>
                 </div>
-                <div className="chart-label">{item.question_id || `Q${index + 1}`}</div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="chart-legend">
-          <span className="legend-item">
-            {avgInterpretation.icon} Average: {avgInterpretation.level}
-          </span>
-        </div>
-      </div>
-    );
-  };
-
-  // Radar chart for overall metrics visualization
-  const MetricsRadar = ({ data }) => {
-    if (!data || data.length === 0) return null;
-    
-    const metric = data[0];
-    const radarMetrics = [
-      { name: 'Difficulty', value: metric.difficulty_score || 0, max: 10 },
-      { name: 'Alignment', value: metric.syllabus_alignment_score || 0, max: 10 },
-      { name: 'Depth', value: metric.application_depth || 0, max: 5 },
-      { name: 'Complexity', value: metric.complexity_index || 0, max: 10 }
-    ];
-
-    return (
-      <div className="metrics-radar">
-        <div className="radar-header">
-          <h4 className="radar-title">🎯 Question Analysis Overview</h4>
-        </div>
-        <div className="radar-container">
-          {radarMetrics.map((item, index) => {
-            const percentage = (item.value / item.max) * 100;
-            return (
-              <div key={index} className="radar-metric">
-                <div className="radar-label">{item.name}</div>
-                <div className="radar-bar">
-                  <div 
-                    className="radar-fill" 
-                    style={{ width: `${percentage}%` }}
-                  ></div>
+                <div className="bar-label">
+                  {data.length === 1 ? 'Analysis' : `Q${index + 1}`}
                 </div>
-                <div className="radar-value">{item.value}/{item.max}</div>
               </div>
             );
           })}
@@ -220,67 +133,127 @@ const ResultCard = ({ result, studentResponseData = null }) => {
     );
   };
 
-  // Cognitive Level Display Component
-  const CognitiveLevelDisplay = ({ data }) => {
+  // Simple pie chart component
+  const PieChart = ({ data, title }) => {
     if (!data || data.length === 0) return null;
     
-    const metric = data[0];
-    const cognitiveLevel = metric.cognitive_level || 'Apply';
-    
-    const levelColors = {
-      'Remember': { color: '#e3f2fd', text: '#1565c0' },
-      'Understand': { color: '#f3e5f5', text: '#7b1fa2' },
-      'Apply': { color: '#e8f5e8', text: '#2e7d32' },
-      'Analyze': { color: '#fff3e0', text: '#f57c00' },
-      'Evaluate': { color: '#fce4ec', text: '#c2185b' },
-      'Create': { color: '#f1f8e9', text: '#558b2f' }
+    // Calculate distribution of difficulty levels
+    const difficultyDistribution = data.reduce((acc, item) => {
+      // Normalize the difficulty label to match our color mapping
+      let level = item.difficulty_label || 'Unknown';
+      
+      // Handle different variations of difficulty labels
+      level = level.toLowerCase();
+      if (level.includes('easy')) level = 'Easy';
+      else if (level.includes('moderate') || level.includes('medium')) level = 'Moderate';
+      else if (level.includes('hard') || level.includes('tough') || level.includes('difficult')) level = 'Hard';
+      else level = 'Unknown';
+      
+      acc[level] = (acc[level] || 0) + 1;
+      return acc;
+    }, {});
+
+    const total = data.length;
+    const segments = Object.entries(difficultyDistribution).map(([level, count]) => ({
+      label: level,
+      value: count,
+      percentage: (count / total) * 100
+    }));
+
+    // Updated color mapping with more vibrant colors
+    const colors = {
+      'Easy': '#4CAF50',      // Green
+      'Moderate': '#FF9800',   // Orange
+      'Hard': '#F44336',       // Red
+      'Unknown': '#9E9E9E',    // Grey
+      'Tough': '#F44336',      // Red (alias for Hard)
+      'Medium': '#FF9800'      // Orange (alias for Moderate)
     };
-    
-    const levelStyle = levelColors[cognitiveLevel] || levelColors['Apply'];
+
+    let cumulativePercentage = 0;
 
     return (
-      <div className="cognitive-level-display">
+      <div className="pie-chart">
         <div className="chart-header">
-          <h4 className="chart-title">🧠 Bloom's Taxonomy Level</h4>
+          <h4 className="chart-title">{title}</h4>
         </div>
-        <div className="cognitive-level-container">
-          <div 
-            className="cognitive-level-badge"
-            style={{ 
-              backgroundColor: levelStyle.color, 
-              color: levelStyle.text,
-              border: `2px solid ${levelStyle.text}20`
-            }}
-          >
-            <div className="level-icon">
-              {cognitiveLevel === 'Remember' && '📚'}
-              {cognitiveLevel === 'Understand' && '💡'}
-              {cognitiveLevel === 'Apply' && '🔧'}
-              {cognitiveLevel === 'Analyze' && '🔍'}
-              {cognitiveLevel === 'Evaluate' && '⚖️'}
-              {cognitiveLevel === 'Create' && '🎨'}
-            </div>
-            <div className="level-text">
-              <div className="level-name">{cognitiveLevel}</div>
-              <div className="level-description">
-                {cognitiveLevel === 'Remember' && 'Recall facts and basic concepts'}
-                {cognitiveLevel === 'Understand' && 'Explain ideas or concepts'}
-                {cognitiveLevel === 'Apply' && 'Use information in new situations'}
-                {cognitiveLevel === 'Analyze' && 'Draw connections among ideas'}
-                {cognitiveLevel === 'Evaluate' && 'Justify decisions or courses of action'}
-                {cognitiveLevel === 'Create' && 'Produce new or original work'}
+        <div className="pie-chart-container">
+          <div className="pie-wrapper">
+            <svg className="pie-svg" viewBox="0 0 100 100">
+              {segments.map((segment, index) => {
+                const startAngle = (cumulativePercentage / 100) * 360;
+                const endAngle = ((cumulativePercentage + segment.percentage) / 100) * 360;
+                cumulativePercentage += segment.percentage;
+                
+                const x1 = 50 + 40 * Math.cos((startAngle - 90) * Math.PI / 180);
+                const y1 = 50 + 40 * Math.sin((startAngle - 90) * Math.PI / 180);
+                const x2 = 50 + 40 * Math.cos((endAngle - 90) * Math.PI / 180);
+                const y2 = 50 + 40 * Math.sin((endAngle - 90) * Math.PI / 180);
+                
+                const largeArcFlag = segment.percentage > 50 ? 1 : 0;
+                
+                const pathData = [
+                  `M 50 50`,
+                  `L ${x1} ${y1}`,
+                  `A 40 40 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+                  'Z'
+                ].join(' ');
+
+                // Ensure we have a color for this segment
+                const segmentColor = colors[segment.label] || colors['Unknown'];
+
+                return (
+                  <path
+                    key={index}
+                    d={pathData}
+                    fill={segmentColor}
+                    stroke="#fff"
+                    strokeWidth="1"
+                    style={{ 
+                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                      transition: 'all 0.3s ease'
+                    }}
+                  />
+                );
+              })}
+            </svg>
+          </div>
+          <div className="pie-legend">
+            {segments.map((segment, index) => (
+              <div key={index} className="legend-item">
+                <div 
+                  className="legend-color"
+                  style={{ backgroundColor: colors[segment.label] || colors['Unknown'] }}
+                ></div>
+                <span className="legend-text">
+                  {segment.label}: {segment.value} ({segment.percentage.toFixed(1)}%)
+                </span>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
     );
   };
 
-  // Debug logging (remove in production)
-  console.log('AI Result:', result);
-  console.log('Parsed Difficulty:', difficulty);
-  console.log('Parsed Score:', score);
+  // Generalized metrics summary
+  const getGeneralizedMetrics = (data) => {
+    if (!data || data.length === 0) return null;
+    
+    const avgDifficulty = data.reduce((sum, item) => sum + (item.difficulty_score || 0), 0) / data.length;
+    const avgAlignment = data.reduce((sum, item) => sum + (item.syllabus_alignment_score || 0), 0) / data.length;
+    const avgComplexity = data.reduce((sum, item) => sum + (item.complexity_index || 0), 0) / data.length;
+    
+    return {
+      avgDifficulty: avgDifficulty.toFixed(1),
+      avgAlignment: avgAlignment.toFixed(1),
+      avgComplexity: avgComplexity.toFixed(1),
+      totalQuestions: data.length,
+      cognitiveLevel: data[0]?.cognitive_level || 'Apply'
+    };
+  };
+
+  const generalMetrics = getGeneralizedMetrics(metrics);
 
   const getDifficultyColor = (level) => {
     switch (level) {
@@ -312,6 +285,7 @@ const ResultCard = ({ result, studentResponseData = null }) => {
       fullResult: result,
       analysisText: result.analysis || result,
       metrics: viewMode === 'metrics' ? metrics : null,
+      generalMetrics: viewMode === 'metrics' ? generalMetrics : null,
       aiModel: result.ai_model || 'unknown',
       analysis: {
         generatedAt: timestamp,
@@ -416,225 +390,216 @@ const ResultCard = ({ result, studentResponseData = null }) => {
       <div className={`result-content ${isExpanded ? 'expanded' : ''}`}>
         {viewMode === 'standard' ? (
           <div className="result-text">
-            <div className="formatted-result">
-              {(result.analysis || result).split('\n').map((line, index) => (
-                <p key={index} className="result-line">
-                  {line.trim() && (
-                    <>
-                      {line.includes(':') ? (
-                        <>
-                          <strong>{line.split(':')[0]}:</strong>
-                          {line.split(':').slice(1).join(':')}
-                        </>
-                      ) : (
-                        line
-                      )}
-                    </>
+            {!isExpanded ? (
+              /* Summary View - Show only when collapsed */
+              <div className="analysis-summary">
+                <h3 className="summary-title">📋 Analysis Summary</h3>
+                <div className="summary-content">
+                  {metrics && metrics.length > 0 ? (
+                    <div className="summary-stats">
+                      <div className="summary-grid">
+                        <div className="summary-item">
+                          <span className="summary-icon">📊</span>
+                          <div className="summary-details">
+                            <span className="summary-label">Questions Analyzed</span>
+                            <span className="summary-value">{metrics.length}</span>
+                          </div>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-icon">🎯</span>
+                          <div className="summary-details">
+                            <span className="summary-label">Avg Difficulty</span>
+                            <span className="summary-value">
+                              {(metrics.reduce((sum, item) => sum + (item.difficulty_score || 0), 0) / metrics.length).toFixed(1)}/10
+                            </span>
+                          </div>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-icon">📚</span>
+                          <div className="summary-details">
+                            <span className="summary-label">Syllabus Alignment</span>
+                            <span className="summary-value">
+                              {(metrics.reduce((sum, item) => sum + (item.syllabus_alignment_score || 0), 0) / metrics.length).toFixed(1)}/10
+                            </span>
+                          </div>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-icon">🧠</span>
+                          <div className="summary-details">
+                            <span className="summary-label">Cognitive Level</span>
+                            <span className="summary-value">{metrics[0]?.cognitive_level || 'Mixed'}</span>
+                          </div>
+                        </div>
+                        <div className="summary-item">
+                          <span className="summary-icon">⏱️</span>
+                          <div className="summary-details">
+                            <span className="summary-label">Total Time Estimate</span>
+                            <span className="summary-value">
+                              {(() => {
+                                const totalMinutes = metrics.reduce((sum, item) => {
+                                  const timeStr = item.estimated_time_to_solve || '15 minutes';
+                                  const timeMatch = timeStr.match(/(\d+)/);
+                                  return sum + (timeMatch ? parseInt(timeMatch[1]) : 15);
+                                }, 0);
+                                const hours = Math.floor(totalMinutes / 60);
+                                const minutes = totalMinutes % 60;
+                                return hours > 0 ? `${hours}h ${minutes}m` : `${totalMinutes}m`;
+                              })()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="summary-description">
+                        <p className="summary-text">
+                          This analysis covers <strong>{metrics.length} question{metrics.length > 1 ? 's' : ''}</strong> with 
+                          an average difficulty of <strong>{(metrics.reduce((sum, item) => sum + (item.difficulty_score || 0), 0) / metrics.length).toFixed(1)}/10</strong>. 
+                          The questions show <strong>{(metrics.reduce((sum, item) => sum + (item.syllabus_alignment_score || 0), 0) / metrics.length).toFixed(1)}/10</strong> alignment 
+                          with the syllabus objectives.
+                        </p>
+                        <div className="expand-hint">
+                          <span className="hint-text">👇 Click expand to view detailed analysis for each question</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="summary-basic">
+                      <p className="summary-text">
+                        Analysis complete! The question paper has been evaluated for difficulty level, 
+                        syllabus alignment, and cognitive complexity.
+                      </p>
+                      <div className="expand-hint">
+                        <span className="hint-text">👇 Click expand to view detailed analysis</span>
+                      </div>
+                    </div>
                   )}
-                </p>
-              ))}
-            </div>
+                </div>
+              </div>
+            ) : (
+              /* Detailed Analysis - Show only when expanded */
+              <div className="detailed-analysis">
+                <h3 className="analysis-title">📋 Detailed Question Analysis</h3>
+                <div className="formatted-result">
+                  {(result.analysis || result).split('\n').map((line, index) => (
+                    <p key={index} className="result-line">
+                      {line.trim() && (
+                        <>
+                          {line.includes(':') ? (
+                            <>
+                              <strong>{line.split(':')[0]}:</strong>
+                              {line.split(':').slice(1).join(':')}
+                            </>
+                          ) : (
+                            line
+                          )}
+                        </>
+                      )}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
-          /* Metrics View */
+          /* Simplified Metrics View with Pie Chart and Bar Graphs */
           <div className="metrics-view">
-            {metrics && metrics.length > 0 ? (
+            {generalMetrics ? (
               <>
                 <div className="metrics-summary">
-                  <h3 className="metrics-title">📊 Question Difficulty Analytics</h3>
+                  <h3 className="metrics-title">📊 Question Analysis Overview</h3>
                   <div className="metrics-overview">
                     <div className="overview-stats">
                       <div className="stat-card">
-                        <span className="stat-icon">�</span>
-                        <span className="stat-value">{metrics[0]?.difficulty_score || 0}</span>
-                        <span className="stat-label">Difficulty Score</span>
+                        <span className="stat-icon">📊</span>
+                        <span className="stat-value">{generalMetrics.avgDifficulty}</span>
+                        <span className="stat-label">Avg Difficulty</span>
                       </div>
                       <div className="stat-card">
                         <span className="stat-icon">🎯</span>
-                        <span className="stat-value">{metrics[0]?.syllabus_alignment_score || 0}</span>
-                        <span className="stat-label">Alignment Score</span>
+                        <span className="stat-value">{generalMetrics.avgAlignment}</span>
+                        <span className="stat-label">Avg Alignment</span>
                       </div>
                       <div className="stat-card">
                         <span className="stat-icon">🔥</span>
-                        <span className="stat-value">{metrics[0]?.complexity_index || 0}/10</span>
-                        <span className="stat-label">Complexity Index</span>
+                        <span className="stat-value">{generalMetrics.avgComplexity}</span>
+                        <span className="stat-label">Avg Complexity</span>
                       </div>
                       <div className="stat-card">
-                        <span className="stat-icon">⏱️</span>
-                        <span className="stat-value">{metrics[0]?.estimated_time_to_solve || '15 min'}</span>
-                        <span className="stat-label">Est. Time</span>
+                        <span className="stat-icon">📝</span>
+                        <span className="stat-value">{generalMetrics.totalQuestions}</span>
+                        <span className="stat-label">Total Questions</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="metrics-tables">
-                  <div className="metrics-table">
-                    <h4 className="table-title">📋 Detailed Question Analysis</h4>
-                    <div className="table-container">
-                      <table className="metrics-data-table">
-                        <thead>
-                          <tr>
-                            <th>Metric</th>
-                            <th>Value</th>
-                            <th>Level</th>
-                            <th>Description</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {metrics.map((metric, index) => {
-                            const difficultyInterpretation = getMetricInterpretation('difficulty_score', metric.difficulty_score);
-                            const alignmentInterpretation = getMetricInterpretation('syllabus_alignment_score', metric.syllabus_alignment_score);
-                            const complexityInterpretation = getMetricInterpretation('complexity_index', metric.complexity_index);
-                            
-                            return (
-                              <React.Fragment key={index}>
-                                <tr className="question-separator">
-                                  <td colSpan="4" className="question-number">
-                                    <strong>📝 Question {index + 1}</strong>
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td className="metric-name">📊 Difficulty Score</td>
-                                  <td className={`metric-value ${difficultyInterpretation.color}`}>
-                                    {metric.difficulty_score}/10
-                                  </td>
-                                  <td className={`metric-level ${difficultyInterpretation.color}`}>
-                                    {difficultyInterpretation.icon} {difficultyInterpretation.level}
-                                  </td>
-                                  <td className="metric-description">Overall question difficulty</td>
-                                </tr>
-                                <tr>
-                                  <td className="metric-name">🎯 Syllabus Alignment</td>
-                                  <td className={`metric-value ${alignmentInterpretation.color}`}>
-                                    {metric.syllabus_alignment_score}/10
-                                  </td>
-                                  <td className={`metric-level ${alignmentInterpretation.color}`}>
-                                    {alignmentInterpretation.icon} {alignmentInterpretation.level}
-                                  </td>
-                                  <td className="metric-description">How well aligned with syllabus</td>
-                                </tr>
-                                <tr>
-                                  <td className="metric-name">⏱️ Estimated Time</td>
-                                  <td className="metric-value">
-                                    {metric.estimated_time_to_solve}
-                                  </td>
-                                  <td className="metric-level">
-                                    ⏰ Duration
-                                    {/* ⏰ Duration */}
-                                  </td>
-                                  <td className="metric-description">Time needed to solve</td>
-                                </tr>
-                                <tr>
-                                  <td className="metric-name"> Complexity Index</td>
-                                  {/* <td className="metric-name">🔥 Complexity Index</td> */}
-                                  <td className={`metric-value ${complexityInterpretation.color}`}>
-                                    {metric.complexity_index}/10
-                                  </td>
-                                  <td className={`metric-level ${complexityInterpretation.color}`}>
-                                    {complexityInterpretation.icon} {complexityInterpretation.level}
-                                  </td>
-                                  <td className="metric-description">Overall complexity measure</td>
-                                </tr>
-                              </React.Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                <div className="charts-container">
+                  <div className="charts-row">
+                    <div className="chart-item">
+                      <PieChart 
+                        data={metrics} 
+                        title="📊 Difficulty Distribution" 
+                      />
+                    </div>
+                    
+                    <div className="chart-item">
+                      <BarChart 
+                        data={metrics} 
+                        title="📊 Difficulty Scores" 
+                        metric="difficulty_score"
+                        color="primary"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="charts-row">
+                    <div className="chart-item">
+                      <BarChart 
+                        data={metrics} 
+                        title="🎯 Syllabus Alignment" 
+                        metric="syllabus_alignment_score"
+                        color="success"
+                      />
+                    </div>
+                    
+                    <div className="chart-item">
+                      <BarChart 
+                        data={metrics} 
+                        title="🎯 Application Depth" 
+                        metric="complexity_index"
+                        color="warning"
+                      />
                     </div>
                   </div>
                 </div>
 
                 {isExpanded && (
-                  <div className="metrics-charts">
-                    <div className="charts-section">
-                      <div className="chart-controls">
-                        <h4 className="charts-title">📈 Interactive Metrics Visualization</h4>
-                        <div className="metric-selector">
-                          <label htmlFor="metric-dropdown">Select Metric to Visualize:</label>
-                          <select 
-                            id="metric-dropdown" 
-                            className="metric-dropdown"
-                            value={selectedChartMetric}
-                            onChange={(e) => setSelectedChartMetric(e.target.value)}
-                          >
-                            <option value="difficulty_score">📊 Difficulty Score</option>
-                            <option value="syllabus_alignment_score">🎯 Syllabus Alignment</option>
-                            <option value="complexity_index">🔥 Complexity Index</option>
-                          </select>
-                        </div>
+                  <div className="metrics-insights">
+                    <h4 className="insights-title">💡 Key Insights</h4>
+                    <div className="insights-list">
+                      <div className="insight-item">
+                        <span className="insight-icon">📊</span>
+                        <span className="insight-text">
+                          Average difficulty score: <strong>{generalMetrics.avgDifficulty}/10</strong>
+                        </span>
                       </div>
-                      
-                      <div className="selected-chart">
-                        <MetricsChart data={metrics} type={selectedChartMetric} />
+                      <div className="insight-item">
+                        <span className="insight-icon">🎯</span>
+                        <span className="insight-text">
+                          Average syllabus alignment: <strong>{generalMetrics.avgAlignment}/10</strong>
+                        </span>
                       </div>
-                    </div>
-                    
-                    <div className="charts-grid">
-                      <div className="grid-title">
-                        <h4>📊 All Metrics Overview</h4>
-                        <p>Comprehensive view of all question metrics</p>
+                      <div className="insight-item">
+                        <span className="insight-icon">🧠</span>
+                        <span className="insight-text">
+                          Primary cognitive level: <strong>{generalMetrics.cognitiveLevel}</strong>
+                        </span>
                       </div>
-                      <div className="chart-grid-container">
-                        <MetricsChart data={metrics} type="difficulty_score" />
-                        <MetricsChart data={metrics} type="application_depth" />
-                        <MetricsChart data={metrics} type="complexity_index" />
-                        <MetricsChart data={metrics} type="syllabus_alignment_score" />
-                      </div>
-                      <CognitiveLevelDisplay data={metrics} />
-                    </div>
-                    
-                    <div className="radar-section">
-                      <MetricsRadar data={metrics} />
-                    </div>
-
-                    <div className="metrics-insights">
-                      <h4 className="insights-title">💡 Key Insights</h4>
-                      <div className="insights-list">
-                        {(() => {
-                          if (!metrics || metrics.length === 0) return null;
-                          const metric = metrics[0];
-                          
-                          return (
-                            <>
-                              <div className="insight-item">
-                                <span className="insight-icon">📊</span>
-                                <span className="insight-text">
-                                  This question has a difficulty score of {metric.difficulty_score}/10, 
-                                  categorized as <strong>{metric.difficulty_label}</strong>
-                                </span>
-                              </div>
-                              <div className="insight-item">
-                                <span className="insight-icon">🎯</span>
-                                <span className="insight-text">
-                                  Syllabus alignment score is {metric.syllabus_alignment_score}/10, 
-                                  indicating {metric.syllabus_alignment_score >= 8 ? 'excellent' : 
-                                            metric.syllabus_alignment_score >= 6 ? 'good' : 'poor'} alignment
-                                </span>
-                              </div>
-                              <div className="insight-item">
-                                <span className="insight-icon">🧠</span>
-                                <span className="insight-text">
-                                  Requires <strong>{metric.cognitive_level}</strong> level thinking according to Bloom's Taxonomy
-                                </span>
-                              </div>
-                              <div className="insight-item">
-                                <span className="insight-icon">⏱️</span>
-                                <span className="insight-text">
-                                  Estimated solving time: <strong>{metric.estimated_time_to_solve}</strong>
-                                </span>
-                              </div>
-                              <div className="insight-item">
-                                <span className="insight-icon">🔥</span>
-                                <span className="insight-text">
-                                  Complexity index of {metric.complexity_index}/10 suggests a 
-                                  {metric.complexity_index <= 4 ? ' simple' : 
-                                   metric.complexity_index <= 7 ? ' moderately complex' : ' highly complex'} question
-                                </span>
-                              </div>
-                            </>
-                          );
-                        })()}
+                      <div className="insight-item">
+                        <span className="insight-icon">🔥</span>
+                        <span className="insight-text">
+                          Average complexity: <strong>{generalMetrics.avgComplexity}/10</strong>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -650,11 +615,9 @@ const ResultCard = ({ result, studentResponseData = null }) => {
                     <div className="metric-item">📊 <strong>Difficulty Score</strong> - Overall question difficulty (1-10)</div>
                     <div className="metric-item">🎯 <strong>Syllabus Alignment</strong> - How well aligned with course content</div>
                     <div className="metric-item">🧠 <strong>Cognitive Level</strong> - Bloom's Taxonomy classification</div>
-                    <div className="metric-item">🔧 <strong>Application Depth</strong> - Level of practical application required</div>
-                    <div className="metric-item">⏱️ <strong>Estimated Time</strong> - Expected solving duration</div>
-                    <div className="metric-item">🔥 <strong>Complexity Index</strong> - Combined complexity measure</div>
+                    <div className="metric-item">🎯 <strong>Application Depth</strong> - How deep application knowledge is required (1-5 scale)</div>
                   </div>
-                  <p><em>These metrics focus on question characteristics rather than student performance data.</em></p>
+                  <p><em>Visual charts will display once analysis is complete.</em></p>
                 </div>
               </div>
             )}

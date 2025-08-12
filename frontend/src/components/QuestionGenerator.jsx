@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import axios from 'axios'; // for api calls
 import './QuestionGenerator.css';
 
-const QuestionGenerator = ({ setResult, result }) => {
+const QuestionGenerator = ({ setResult, result, onNavigate }) => {
   // file upload state
   const [syllabus, setSyllabus] = useState(null);
   const [objectives, setObjectives] = useState("");
@@ -10,7 +10,7 @@ const QuestionGenerator = ({ setResult, result }) => {
   // q type dropdown
   const [questionType, setQuestionType] = useState("assignment");
   const [difficultyLevel, setDifficultyLevel] = useState("moderate"); // difficulty selector
-   const [aiModel, setAiModel] = useState("openrouter"); // default ai model
+   const [aiModel, setAiModel] = useState("gemini"); // default ai model - Gemini Pro
   const [loading, setLoading] = useState(false); // loading spinner
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0); // progress bar %
@@ -37,8 +37,8 @@ const QuestionGenerator = ({ setResult, result }) => {
 
   // ai model configs - diff providers 
   const aiModels = [
+    { value: 'gemini', label: '🔮 Gemini Pro', description: 'Google\'s latest AI model (Default)' },
     { value: 'openrouter', label: '🤖 Claude 3.5 Sonnet (OpenRouter)', description: 'Advanced reasoning and analysis' },
-    { value: 'gemini', label: '🔮 Gemini Pro', description: 'Google\'s latest AI model' },
     { value: 'groq', label: '⚡ Llama 3 (Groq)', description: 'Fast and efficient processing' },
     { value: 'openai', label: '🧠 GPT-3.5 Turbo', description: 'OpenAI\'s proven model' }
   ];
@@ -60,7 +60,7 @@ const QuestionGenerator = ({ setResult, result }) => {
       formData.append("syllabus_topics", syllabusTopics);
       formData.append("question_type", questionType);
       formData.append("difficulty_level", difficultyLevel);
-       formData.append("ai_model", aiModel);
+      formData.append("ai_model", aiModel);
 
       // fake progress updates while waiting for response
       const progressInterval = setInterval(() => {
@@ -147,7 +147,7 @@ const QuestionGenerator = ({ setResult, result }) => {
     setSyllabusTopics("");
     setQuestionType("assignment");
     setDifficultyLevel("moderate");
-    setAiModel("openrouter");
+    setAiModel("gemini"); // Reset to Gemini Pro as default
     setError("");
     setResult("");
     setGenerationTime(null);
@@ -342,6 +342,17 @@ ${window.location.hostname}
 
   return (
     <div className={`upload-form-container ${theme}`}>
+      {onNavigate && (
+        <div className="back-button-container">
+          <button 
+            onClick={() => onNavigate('home')}
+            className="back-button"
+            type="button"
+          >
+            ← Back to Home
+          </button>
+        </div>
+      )}
       <div className="upload-form-header">
         <h2 className="upload-form-title">
           📄 Question Paper Generator

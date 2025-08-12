@@ -1,15 +1,72 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-const HomePage = ({ onNavigate }) => {
+const HomePage = ({ onNavigate, user, onLogout }) => {
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const handleLogout = () => {
+    if (window.confirm('Are you sure you want to logout?')) {
+      onLogout();
+    }
+  };
+
+  const handleEditProfile = () => {
+    onNavigate('profile');
+  };
+
   return (
     <div className="home-page-container">
+      {/* Header with user info */}
+      <div className="home-nav">
+        <div className="nav-brand">
+          <h2>🎓 EduAnalyze</h2>
+        </div>
+        <div className="nav-user">
+          <div className="user-dropdown">
+            <button 
+              className="user-button"
+              onClick={() => setShowUserMenu(!showUserMenu)}
+            >
+              <span className="user-avatar">👤</span>
+              <span className="user-name">{user?.username}</span>
+              <span className="dropdown-arrow">▼</span>
+            </button>
+            
+            {showUserMenu && (
+              <div className="user-menu">
+                <div className="user-info">
+                  <div className="user-details">
+                    <strong>{user?.username}</strong>
+                    <small>{user?.email}</small>
+                  </div>
+                </div>
+                <hr className="menu-divider" />
+                <button 
+                  className="menu-item"
+                  onClick={handleEditProfile}
+                >
+                  <span>✏️</span>
+                  Edit Profile
+                </button>
+                <button 
+                  className="menu-item logout"
+                  onClick={handleLogout}
+                >
+                  <span>🚪</span>
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* main header section */}
       <div className="home-header">
         <h1 className="home-title">
           🎓 Educational Analysis Platform
         </h1>
         <p className="home-subtitle">
-          Choose from our suite of educational analysis tools
+          Welcome back, {user?.username}! Choose from our suite of educational analysis tools
         </p>
       </div>
 
@@ -51,22 +108,6 @@ const HomePage = ({ onNavigate }) => {
 
       {/* bottom stats and info section */}
       <div className="home-footer">
-        {/* fake stats for marketing */}
-        <div className="stats-section">
-          <div className="stat-item">
-            <div className="stat-number">1000+</div>
-            <div className="stat-label">Papers Analyzed</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">95%</div>
-            <div className="stat-label">Accuracy Rate</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">50+</div>
-            <div className="stat-label">Educational Institutions</div>
-          </div>
-        </div>
-
         {/* howto guide */}
         <div className="info-section">
           <h4>How it works:</h4>
@@ -86,6 +127,14 @@ const HomePage = ({ onNavigate }) => {
           </div>
         </div>
       </div>
+
+      {/* Click outside to close menu */}
+      {showUserMenu && (
+        <div 
+          className="overlay" 
+          onClick={() => setShowUserMenu(false)}
+        />
+      )}
     </div>
   );
 };

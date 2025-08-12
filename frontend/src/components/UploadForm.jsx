@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
 
-const UploadForm = ({ setResult }) => {
+const UploadForm = ({ setResult, onNavigate }) => {
   const [syllabus, setSyllabus] = useState(null);
   const [questionPdf, setQuestionPdf] = useState(null);
   const [objectives, setObjectives] = useState("");
@@ -14,7 +14,7 @@ const UploadForm = ({ setResult }) => {
   // const [language, setLanguage] = useState('en');
   // const [showPreview, setShowPreview] = useState(false); 
   const [analysisTime, setAnalysisTime] = useState(null);
-  const [aiModel, setAiModel] = useState('openrouter'); // OpenRouter as default
+  const [aiModel, setAiModel] = useState('gemini'); // Gemini Pro as default
   
   const syllabusRef = useRef(null);
   const questionRef = useRef(null);
@@ -121,6 +121,7 @@ const UploadForm = ({ setResult }) => {
     setSyllabus(null);
     setQuestionPdf(null);
     setObjectives("");
+    setAiModel("gemini"); // Reset to Gemini Pro as default
     setError("");
     setResult("");
     setAnalysisTime(null);
@@ -140,6 +141,17 @@ const UploadForm = ({ setResult }) => {
 
   return (
     <div className={`upload-form-container ${theme}`}>
+      {onNavigate && (
+        <div className="back-button-container">
+          <button 
+            onClick={() => onNavigate('home')}
+            className="back-button"
+            type="button"
+          >
+            ← Back to Home
+          </button>
+        </div>
+      )}
       <div className="upload-form-header">
         <h2 className="upload-form-title">
           🎯 Question Difficulty Analyzer
@@ -152,8 +164,8 @@ const UploadForm = ({ setResult }) => {
             className="ai-model-selector"
             title="Select AI Model"
           >
+            <option value="gemini">🌟 Gemini Pro (Default)</option>
             <option value="openrouter">⚡ OpenRouter (Claude-4)</option>
-            <option value="gemini">🌟 Gemini Pro</option>
             <option value="groq">🚀 Groq (Fast)</option>
             <option value="openai">🤖 OpenAI</option>
             <option value="huggingface">🤗 Hugging Face</option>

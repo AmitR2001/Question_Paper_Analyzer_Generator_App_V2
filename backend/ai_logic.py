@@ -11,7 +11,7 @@ from openai import OpenAI
 load_dotenv()
 
 # ai service selection - can be changed via env var
-AI_SERVICE = os.getenv("AI_SERVICE", "openrouter")  # options: openai, anthropic, groq, huggingface, gemini, openrouter
+AI_SERVICE = os.getenv("AI_SERVICE", "gemini")  # options: openai, anthropic, groq, huggingface, gemini, openrouter - Default: Gemini
 
 # openai config
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -267,93 +267,115 @@ def extract_question_metrics(question_id, content, ai_service):
         'ai_model_used': ai_service
     }
     
-    # Extract difficulty label
+    # Extract difficulty label - improved patterns for bullet format
     difficulty_patterns = [
+        r'\*\s*\*\*difficulty\s+label\*\*[:\s]*([^\n\r]+)',
         r'difficulty\s+label[:\s]*([^\n\r]+)',
         r'difficulty[:\s]+(easy|moderate|tough|hard|difficult)',
         r'(easy|moderate|tough|hard|difficult)\s+difficulty'
     ]
     for pattern in difficulty_patterns:
-        match = re.search(pattern, content.lower())
+        match = re.search(pattern, content, re.IGNORECASE)
         if match:
-            metrics['difficulty_label'] = match.group(1).strip().title()
+            difficulty = match.group(1).strip()
+            # Clean up any markdown formatting
+            difficulty = re.sub(r'\*+', '', difficulty)
+            metrics['difficulty_label'] = difficulty.title()
             break
     
-    # Extract difficulty score
+    # Extract difficulty score - improved patterns for bullet format
     score_patterns = [
+        r'\*\s*\*\*difficulty\s+score\*\*[:\s]*(\d+(?:\.\d+)?)',
         r'difficulty\s+score[:\s]*(\d+(?:\.\d+)?)',
         r'score[:\s]*(\d+(?:\.\d+)?)'
     ]
     for pattern in score_patterns:
-        match = re.search(pattern, content.lower())
+        match = re.search(pattern, content, re.IGNORECASE)
         if match:
             metrics['difficulty_score'] = float(match.group(1))
             break
     
-    # Extract syllabus alignment score
+    # Extract syllabus alignment score - improved patterns for bullet format
     alignment_patterns = [
+        r'\*\s*\*\*syllabus\s+alignment\s+score\*\*[:\s]*(\d+(?:\.\d+)?)',
         r'syllabus\s+alignment\s+score[:\s]*(\d+(?:\.\d+)?)',
         r'alignment[:\s]*(\d+(?:\.\d+)?)'
     ]
     for pattern in alignment_patterns:
-        match = re.search(pattern, content.lower())
+        match = re.search(pattern, content, re.IGNORECASE)
         if match:
             metrics['syllabus_alignment_score'] = float(match.group(1))
             break
     
-    # Extract cognitive level
+    # Extract cognitive level - improved patterns for bullet format
     cognitive_patterns = [
+        r'\*\s*\*\*bloom[\'s]*\s+taxonomy\s+level\*\*[:\s]*([^\n\r]+)',
         r'bloom[\'s]*\s+taxonomy\s+level[:\s]*([^\n\r]+)',
         r'cognitive\s+level[:\s]*([^\n\r]+)',
         r'(remember|understand|apply|analyze|evaluate|create)'
     ]
     for pattern in cognitive_patterns:
-        match = re.search(pattern, content.lower())
+        match = re.search(pattern, content, re.IGNORECASE)
         if match:
-            level = match.group(1).strip().title()
+            level = match.group(1).strip()
+            # Clean up any markdown formatting
+            level = re.sub(r'\*+', '', level).title()
             if level in ['Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create']:
                 metrics['cognitive_level'] = level
                 break
     
-    # Extract application depth
+    # Extract application depth - improved patterns for bullet format
     depth_patterns = [
+        r'\*\s*\*\*application\s+depth\*\*[:\s]*(\d+)',
         r'application\s+depth[:\s]*(\d+)',
         r'depth[:\s]*(\d+)'
     ]
     for pattern in depth_patterns:
-        match = re.search(pattern, content.lower())
+        match = re.search(pattern, content, re.IGNORECASE)
         if match:
             metrics['application_depth'] = int(match.group(1))
             break
     
-    # Extract estimated time
+    # Extract estimated time - improved patterns for bullet format
     time_patterns = [
+        r'\*\s*\*\*estimated\s+time\s+to\s+solve\*\*[:\s]*([^\n\r]+)',
         r'estimated\s+time[:\s]*([^\n\r]+)',
         r'time\s+to\s+solve[:\s]*([^\n\r]+)',
         r'(\d+)\s*minutes?'
     ]
     for pattern in time_patterns:
-        match = re.search(pattern, content.lower())
+        match = re.search(pattern, content, re.IGNORECASE)
         if match:
             time_str = match.group(1).strip()
+            # Clean up any markdown formatting
+            time_str = re.sub(r'\*+', '', time_str)
             metrics['estimated_time_to_solve'] = time_str if 'minute' in time_str else f"{time_str} minutes"
             break
     
-    # Extract explanation
+    # Extract explanation - improved patterns for bullet format
     explanation_patterns = [
+        r'\*\s*\*\*brief\s+explanation\*\*[:\s]*([^\n\r*]+)',
         r'brief\s+explanation[:\s]*([^\n\r*]+)',
         r'explanation[:\s]*([^\n\r*]+)'
     ]
     for pattern in explanation_patterns:
         match = re.search(pattern, content, re.IGNORECASE)
         if match:
-            metrics['explanation'] = match.group(1).strip()
+            explanation = match.group(1).strip()
+            # Clean up any markdown formatting
+            explanation = re.sub(r'\*+', '', explanation)
+            metrics['explanation'] = explanation
             break
     
-    # Calculate complexity index based on other metrics
+    # Calculate complexity index based on application depth and difficulty
+    # Since you want to show Application Depth in the third chart, 
+    # we'll use application_depth as the complexity_index
     difficulty_score = metrics.get('difficulty_score', 5)
     application_depth = metrics.get('application_depth', 3)
-    complexity_index = min(10, max(1, (difficulty_score * 0.6) + (application_depth * 1.2) + 2))
+    
+    # Use application_depth directly as complexity_index for the chart
+    # Scale it appropriately (application_depth is 1-5, complexity_index should be 1-10)
+    complexity_index = min(10, max(1, application_depth * 2))
     metrics['complexity_index'] = round(complexity_index, 1)
     
     # Set defaults for missing values
@@ -369,7 +391,7 @@ def extract_question_metrics(question_id, content, ai_service):
 
 def analyze_question_paper(syllabus_text, objectives, question_text):
     # get current ai service setting (can be changed per request)
-    ai_service = os.getenv("AI_SERVICE", "openrouter")
+    ai_service = os.getenv("AI_SERVICE", "gemini")
     logger.info(f"Starting analysis with {ai_service} service")
     
     # extract key topics for smart truncation

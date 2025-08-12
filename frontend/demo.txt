@@ -201,3 +201,26 @@ now only for QuestionGenerator.jsx change  result-action as
       visit https://openrouter.ai/settings/credits 
       and upgrade to a paid account', 'code': 402, 'metadata': {'provider_name': None}},
        'user_id': 'user_30Lagl16qFlMlsZFccqyDXqM3t6'}
+
+
+       this is the expample of raw data standard analysis
+       **Question: Q1 A**
+*   **Difficulty Label**: Moderate
+*   **Difficulty Score**: 6
+*   **Syllabus Alignment Score**: 9 (Directly aligns with Chapter 6: Database Design Using the E-R Model, and Learning Objective 1: Design ER diagram and relational database.)
+*   **Bloom's Taxonomy Level**: Create
+*   **Application Depth**: 4 (Requires applying knowledge of ER modeling concepts to design a system for a specific scenario, involving identification of entities, attributes, relationships, and cardinalities.)
+*   **Estimated Time to Solve**: 20 minutes
+*   **Brief Explanation**: This question requires students to design an ER diagram, which involves applying conceptual knowledge to a new scenario (Blood Bank or Residential Society). It demands creativity and understanding of ER modeling principles, making it more than just recall. The "mentioning all the steps" part adds to the complexity.
+
+**Question: Q1 B**
+*   **Difficulty Label**: Moderate
+*   **Difficulty Score**: 7
+*   **Syllabus Alignment Score**: 9 (Directly aligns with Chapter 7: Relational Database Design, specifically Normal Forms and Functional-Dependency Theory, and Learning Objective 2: Apply normalization on given database.)
+*   **Bloom's Taxonomy Level**: Apply
+*   **Application Depth**: 3 (Involves applying a specific algorithm or process (closure of attributes to find candidate keys) to a given set of functional dependencies.)
+*   **Estimated Time to Solve**: 15 minutes
+*   **Brief Explanation**: This question requires the application of functional dependency theory to find candidate keys, which is a core concept in normalization. It's not just identifying, but enlisting all steps, which requires a clear understanding of the procedure. The circular dependency makes it slightly more complex than a straightforward case.
+
+from this data extract Difficulty Score ,Syllabus Alignment Score,Application Depth and put the values into bar  graph of Difficulty Scores, Syllabus Alignment, Complexity Index respectively instead of demo data
+On each user analysis the data from performed these values should be taken from standard analysis and putted in bar graph as well
