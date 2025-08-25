@@ -17,16 +17,10 @@ AI_SERVICE = os.getenv("AI_SERVICE", "gemini")  # options: openai, anthropic, gr
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
 
-# Claudekey:  
-# 1.	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
-# 2.	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
-# 3.	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
-# 4.	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
-# 5.	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
 
 
 # openrouter config (multiple ai models via one api) - default choice
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "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")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "sk-or-v1-")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
 OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "https://questiondifficulty.app")
 OPENROUTER_SITE_NAME = os.getenv("OPENROUTER_SITE_NAME", "Question Difficulty Analyzer")
@@ -40,7 +34,7 @@ HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 HUGGINGFACE_MODEL = os.getenv("HUGGINGFACE_MODEL", "meta-llama/Llama-2-7b-chat-hf")
 
 # gemini config
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyA3cNeR9I2Su_JfbrjFQxEy2qOvjLW8CWE")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 logger = logging.getLogger(__name__)
