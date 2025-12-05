@@ -10,47 +10,37 @@ from openai import OpenAI
 
 load_dotenv()
 
-# ai service selection - can be changed via env var
-AI_SERVICE = os.getenv("AI_SERVICE", "gemini")  # options: openai, anthropic, groq, huggingface, gemini, openrouter - Default: Gemini
-
-# openai config
+AI_SERVICE = os.getenv("AI_SERVICE", "gemini") 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
 
 
 
-# openrouter config (multiple ai models via one api) - default choice
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "sk-or-v1-")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
 OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "https://questiondifficulty.app")
 OPENROUTER_SITE_NAME = os.getenv("OPENROUTER_SITE_NAME", "Question Difficulty Analyzer")
 
-# groq config (free tier available)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama3-8b-8192")
 
-# hugging face config (free tier)
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 HUGGINGFACE_MODEL = os.getenv("HUGGINGFACE_MODEL", "meta-llama/Llama-2-7b-chat-hf")
 
-# gemini config
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 logger = logging.getLogger(__name__)
 
 def smart_truncate(text, max_chars, priority_keywords=None):
-    """smart truncation that preserves important content, especially for questions"""
     if len(text) <= max_chars:
         return text
     
-    # try to find important sections first
     if priority_keywords:
         important_sections = []
         for keyword in priority_keywords:
             if keyword.lower() in text.lower():
                 start = text.lower().find(keyword.lower())
-                # Get context around the keyword
                 context_start = max(0, start - 100)
                 context_end = min(len(text), start + len(keyword) + 200)
                 important_sections.append(text[context_start:context_end])
@@ -60,12 +50,9 @@ def smart_truncate(text, max_chars, priority_keywords=None):
             if len(combined) <= max_chars:
                 return combined
     
-    # For question papers, try to preserve question structure
     if any(marker in text.lower() for marker in ['question', 'q1', 'q2', 'q3', 'part a', 'part b']):
-        # Try to keep as much of the question text as possible
         return text[:max_chars] + "... [truncated - more questions may exist]"
     
-    # Fallback to beginning + end truncation
     if max_chars > 200:
         beginning = text[:int(max_chars * 0.7)]
         ending = text[-int(max_chars * 0.3):]
@@ -74,25 +61,20 @@ def smart_truncate(text, max_chars, priority_keywords=None):
     return text[:max_chars] + "... [truncated]"
 
 def extract_key_topics(syllabus_text):
-    """Extract key topics from syllabus for prioritization"""
-    # Simple keyword extraction - can be improved with NLP
     keywords = []
     lines = syllabus_text.split('\n')
     for line in lines:
         if any(indicator in line.lower() for indicator in ['chapter', 'unit', 'topic', 'section', 'module']):
             keywords.append(line.strip())
-    return keywords[:10]  # Limit to top 10 topics
+    return keywords[:10]
 
 def generate_question_difficulty_metrics(difficulty_level, score, ai_service):
-    """Generate question difficulty metrics based on AI analysis results"""
     import random
     import json
     
-    # Set random seed based on difficulty and service for consistency
     seed_value = hash(f"{difficulty_level}{score}{ai_service}") % 1000
     random.seed(seed_value)
     
-    # Base configurations for different difficulty levels
     difficulty_configs = {
         'easy': {
             'difficulty_score': (2.0, 4.0),
@@ -124,39 +106,34 @@ def generate_question_difficulty_metrics(difficulty_level, score, ai_service):
         }
     }
     
-    # normalize difficulty level to match our configs
     if difficulty_level.lower() in ['tough', 'hard', 'difficult']:
         config = difficulty_configs['tough']
     elif difficulty_level.lower() in ['easy', 'simple']:
         config = difficulty_configs['easy']
     else:
-        config = difficulty_configs['moderate'] # default fallback
+        config = difficulty_configs['moderate']
     
-    # parse syllabus alignment score from ai response
-    syllabus_alignment = 8.0  # reasonable default
+    syllabus_alignment = 8.0
     if score:
         try:
             numeric_score = float(score)
             if numeric_score <= 10:
                 syllabus_alignment = numeric_score
             else:
-                # handle percentage scores
                 syllabus_alignment = numeric_score / 10.0 if numeric_score <= 100 else 8.0
         except:
-            syllabus_alignment = 8.0 # fallback on parse error
+            syllabus_alignment = 8.0
     
-    # ai model variations - each model has different bias
     ai_variations = {
-        'openrouter': 0.2,   # high quality model, slight positive bias
-        'gemini': 0.1,       # good model, small positive bias
-        'groq': -0.1,        # fast model, slight negative bias
-        'openai': 0.15,      # high quality, positive bias
-        'huggingface': -0.2  # variable quality, negative bias
+        'openrouter': 0.2,
+        'gemini': 0.1,
+        'groq': -0.1,
+        'openai': 0.15,
+        'huggingface': -0.2
     }
     
     variation = ai_variations.get(ai_service.lower(), 0.0)
     
-    # Generate core metrics
     difficulty_score = random.uniform(*config['difficulty_score']) + variation
     difficulty_score = max(1.0, min(10.0, difficulty_score))
     
@@ -164,10 +141,8 @@ def generate_question_difficulty_metrics(difficulty_level, score, ai_service):
     
     estimated_time = random.randint(*config['estimated_time'])
     
-    # Select cognitive level randomly from appropriate levels
     cognitive_level = random.choice(config['cognitive_levels'])
     
-    # Calculate complexity index based on other metrics
     complexity_base = random.uniform(*config['complexity_index'])
     complexity_index = (
         (difficulty_score * 0.4) + 
@@ -177,7 +152,6 @@ def generate_question_difficulty_metrics(difficulty_level, score, ai_service):
     ) + variation
     complexity_index = max(1.0, min(10.0, complexity_index))
     
-    # Determine question type based on difficulty and cognitive level
     question_types = {
         'Remember': ['Multiple Choice', 'Fill in Blanks', 'True/False'],
         'Understand': ['Short Answer', 'Multiple Choice', 'Descriptive'],
@@ -189,20 +163,16 @@ def generate_question_difficulty_metrics(difficulty_level, score, ai_service):
     
     question_type = random.choice(question_types.get(cognitive_level, ['Descriptive']))
     
-    # Determine marks vs effort balance
     effort_balance = 'Balanced'
     if difficulty_score <= 3:
         effort_balance = 'Easy Marks'
     elif difficulty_score >= 8:
         effort_balance = 'High Effort'
     
-    # Calculate concept density (1-5 scale)
     concept_density = min(5, max(1, int((difficulty_score + application_depth) / 2)))
     
-    # Calculate topic weightage match percentage
     topic_weightage = max(60, min(100, int(syllabus_alignment * 10 + random.randint(-10, 10))))
     
-    # Create the metrics object in the new format
     metrics = {
         'difficulty_label': difficulty_level.capitalize(),
         'difficulty_score': round(difficulty_score, 1),
@@ -223,29 +193,23 @@ def generate_question_difficulty_metrics(difficulty_level, score, ai_service):
     return metrics
 
 def parse_multiple_question_analysis(analysis_result, ai_service):
-    """Parse AI analysis result that contains multiple questions and generate metrics for each"""
     import re
     
-    # Split the analysis by question markers
     question_pattern = r'\*\*Question[:\s]*([^*]+)\*\*'
     questions = re.split(question_pattern, analysis_result)
     
     all_metrics = []
     
-    # Process each question found
-    for i in range(1, len(questions), 2):  # Skip empty parts, take question ID and content pairs
+    for i in range(1, len(questions), 2):
         if i + 1 < len(questions):
             question_id = questions[i].strip()
             question_content = questions[i + 1].strip()
             
-            # Extract metrics from this question's analysis
             metrics = extract_question_metrics(question_id, question_content, ai_service)
             if metrics:
                 all_metrics.append(metrics)
     
-    # If no questions found with the pattern, try to extract from the overall text
     if not all_metrics:
-        # Fallback: treat as single question analysis
         metrics = extract_question_metrics("Q1", analysis_result, ai_service)
         if metrics:
             all_metrics.append(metrics)
@@ -253,7 +217,6 @@ def parse_multiple_question_analysis(analysis_result, ai_service):
     return all_metrics
 
 def extract_question_metrics(question_id, content, ai_service):
-    """Extract metrics from a single question's analysis content"""
     import re
     
     metrics = {
@@ -261,7 +224,6 @@ def extract_question_metrics(question_id, content, ai_service):
         'ai_model_used': ai_service
     }
     
-    # Extract difficulty label - improved patterns for bullet format
     difficulty_patterns = [
         r'\*\s*\*\*difficulty\s+label\*\*[:\s]*([^\n\r]+)',
         r'difficulty\s+label[:\s]*([^\n\r]+)',
@@ -272,12 +234,10 @@ def extract_question_metrics(question_id, content, ai_service):
         match = re.search(pattern, content, re.IGNORECASE)
         if match:
             difficulty = match.group(1).strip()
-            # Clean up any markdown formatting
             difficulty = re.sub(r'\*+', '', difficulty)
             metrics['difficulty_label'] = difficulty.title()
             break
     
-    # Extract difficulty score - improved patterns for bullet format
     score_patterns = [
         r'\*\s*\*\*difficulty\s+score\*\*[:\s]*(\d+(?:\.\d+)?)',
         r'difficulty\s+score[:\s]*(\d+(?:\.\d+)?)',
@@ -289,7 +249,6 @@ def extract_question_metrics(question_id, content, ai_service):
             metrics['difficulty_score'] = float(match.group(1))
             break
     
-    # Extract syllabus alignment score - improved patterns for bullet format
     alignment_patterns = [
         r'\*\s*\*\*syllabus\s+alignment\s+score\*\*[:\s]*(\d+(?:\.\d+)?)',
         r'syllabus\s+alignment\s+score[:\s]*(\d+(?:\.\d+)?)',
@@ -301,7 +260,6 @@ def extract_question_metrics(question_id, content, ai_service):
             metrics['syllabus_alignment_score'] = float(match.group(1))
             break
     
-    # Extract cognitive level - improved patterns for bullet format
     cognitive_patterns = [
         r'\*\s*\*\*bloom[\'s]*\s+taxonomy\s+level\*\*[:\s]*([^\n\r]+)',
         r'bloom[\'s]*\s+taxonomy\s+level[:\s]*([^\n\r]+)',
@@ -312,13 +270,11 @@ def extract_question_metrics(question_id, content, ai_service):
         match = re.search(pattern, content, re.IGNORECASE)
         if match:
             level = match.group(1).strip()
-            # Clean up any markdown formatting
             level = re.sub(r'\*+', '', level).title()
             if level in ['Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create']:
                 metrics['cognitive_level'] = level
                 break
     
-    # Extract application depth - improved patterns for bullet format
     depth_patterns = [
         r'\*\s*\*\*application\s+depth\*\*[:\s]*(\d+)',
         r'application\s+depth[:\s]*(\d+)',
@@ -330,7 +286,6 @@ def extract_question_metrics(question_id, content, ai_service):
             metrics['application_depth'] = int(match.group(1))
             break
     
-    # Extract estimated time - improved patterns for bullet format
     time_patterns = [
         r'\*\s*\*\*estimated\s+time\s+to\s+solve\*\*[:\s]*([^\n\r]+)',
         r'estimated\s+time[:\s]*([^\n\r]+)',
@@ -341,12 +296,10 @@ def extract_question_metrics(question_id, content, ai_service):
         match = re.search(pattern, content, re.IGNORECASE)
         if match:
             time_str = match.group(1).strip()
-            # Clean up any markdown formatting
             time_str = re.sub(r'\*+', '', time_str)
             metrics['estimated_time_to_solve'] = time_str if 'minute' in time_str else f"{time_str} minutes"
             break
     
-    # Extract explanation - improved patterns for bullet format
     explanation_patterns = [
         r'\*\s*\*\*brief\s+explanation\*\*[:\s]*([^\n\r*]+)',
         r'brief\s+explanation[:\s]*([^\n\r*]+)',
@@ -356,23 +309,16 @@ def extract_question_metrics(question_id, content, ai_service):
         match = re.search(pattern, content, re.IGNORECASE)
         if match:
             explanation = match.group(1).strip()
-            # Clean up any markdown formatting
             explanation = re.sub(r'\*+', '', explanation)
             metrics['explanation'] = explanation
             break
     
-    # Calculate complexity index based on application depth and difficulty
-    # Since you want to show Application Depth in the third chart, 
-    # we'll use application_depth as the complexity_index
     difficulty_score = metrics.get('difficulty_score', 5)
     application_depth = metrics.get('application_depth', 3)
     
-    # Use application_depth directly as complexity_index for the chart
-    # Scale it appropriately (application_depth is 1-5, complexity_index should be 1-10)
     complexity_index = min(10, max(1, application_depth * 2))
     metrics['complexity_index'] = round(complexity_index, 1)
     
-    # Set defaults for missing values
     metrics.setdefault('difficulty_label', 'Moderate')
     metrics.setdefault('difficulty_score', 6.0)
     metrics.setdefault('syllabus_alignment_score', 7.0)
@@ -384,22 +330,18 @@ def extract_question_metrics(question_id, content, ai_service):
     return metrics
 
 def analyze_question_paper(syllabus_text, objectives, question_text):
-    # get current ai service setting (can be changed per request)
     ai_service = os.getenv("AI_SERVICE", "gemini")
     logger.info(f"Starting analysis with {ai_service} service")
     
-    # extract key topics for smart truncation
     key_topics = extract_key_topics(syllabus_text)
     logger.info(f"Key topics extracted: {len(key_topics)} topics")
     
-    # smart truncation with priority - increased limits for comprehensive analysis
     truncated_syllabus = smart_truncate(syllabus_text, 4000, key_topics)
     truncated_objectives = smart_truncate(objectives, 1000)
-    truncated_question = smart_truncate(question_text, 8000)  # much larger limit for questions
+    truncated_question = smart_truncate(question_text, 8000)
     
     logger.info(f"Text lengths after smart truncation - Syllabus: {len(truncated_syllabus)}, Objectives: {len(truncated_objectives)}, Question: {len(truncated_question)}")
     
-    # enhanced prompt for comprehensive analysis of all questions
     prompt = f"""You are an expert in educational assessment and curriculum design.
 
 IMPORTANT: Analyze EVERY SINGLE QUESTION in the question paper. Do not stop until you have analyzed all questions.
@@ -454,28 +396,22 @@ Provide specific numeric scores and clear reasoning for EVERY question."""
             logger.error(f"Unsupported AI service: {ai_service}")
             return "Error: Unsupported AI service configured."
         
-        # Parse multiple questions from the analysis result
         all_question_metrics = parse_multiple_question_analysis(analysis_result, ai_service)
         
-        # If we have multiple questions, return the first one as the primary result
-        # but include all metrics for comprehensive analysis
         if all_question_metrics:
             primary_metrics = all_question_metrics[0]
             
-            # Combine analysis result with comprehensive metrics
             result_with_metrics = {
                 'analysis': analysis_result,
                 'metrics': primary_metrics,
-                'all_questions_metrics': all_question_metrics,  # All questions analyzed
+                'all_questions_metrics': all_question_metrics,
                 'ai_model': ai_service,
                 'total_questions_analyzed': len(all_question_metrics)
             }
         else:
-            # Fallback: generate metrics from basic extraction
             difficulty_match = None
             score_match = None
             
-            # Try to extract difficulty
             difficulty_patterns = [
                 r'difficulty[:\s]+(easy|moderate|tough|hard|difficult)',
                 r'(easy|moderate|tough|hard|difficult)\s+difficulty',
@@ -489,7 +425,6 @@ Provide specific numeric scores and clear reasoning for EVERY question."""
                     difficulty_match = match.group(1)
                     break
             
-            # Try to extract score
             score_patterns = [
                 r'score[:\s]+(\d+(?:\.\d+)?)',
                 r'alignment[:\s]+(\d+(?:\.\d+)?)',
@@ -504,14 +439,12 @@ Provide specific numeric scores and clear reasoning for EVERY question."""
                     score_match = match.group(1)
                     break
             
-            # Generate dynamic metrics
             metrics = generate_question_difficulty_metrics(
                 difficulty_match or 'moderate',
                 score_match,
                 ai_service
             )
             
-            # Combine analysis result with metrics
             result_with_metrics = {
                 'analysis': analysis_result,
                 'metrics': metrics,
@@ -540,7 +473,7 @@ def analyze_with_openai(prompt):
     data = {
         "model": OPENAI_MODEL,
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 2000  # Increased for comprehensive analysis
+        "max_tokens": 2000
     }
     
     response = requests.post(
@@ -565,13 +498,11 @@ def analyze_with_openrouter(prompt):
         return "Error: OpenRouter API key not configured."
     
     try:
-        # Initialize OpenRouter client using OpenAI library
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
         )
         
-        # Make the completion request
         completion = client.chat.completions.create(
             extra_headers={
                 "HTTP-Referer": OPENROUTER_SITE_URL,
@@ -584,7 +515,7 @@ def analyze_with_openrouter(prompt):
                     "content": prompt
                 }
             ],
-            max_tokens=2000  # Increased for comprehensive analysis
+            max_tokens=2000
         )
         
         logger.info("Successfully received response from OpenRouter")
@@ -609,7 +540,7 @@ def analyze_with_groq(prompt):
     data = {
         "model": GROQ_MODEL,
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 2000  # Increased for comprehensive analysis
+        "max_tokens": 2000
     }
     
     try:
@@ -646,7 +577,7 @@ def analyze_with_huggingface(prompt):
     data = {
         "inputs": prompt,
         "parameters": {
-            "max_new_tokens": 2000,  # Increased for comprehensive analysis
+            "max_new_tokens": 2000,
             "temperature": 0.7
         }
     }
@@ -676,10 +607,8 @@ def analyze_with_gemini(prompt):
         return "Error: Gemini API key not configured."
     
     try:
-        # Initialize the Gemini client
         client = genai.Client(api_key=GEMINI_API_KEY)
         
-        # Generate content using Gemini with thinking disabled for faster response
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=prompt,
@@ -696,24 +625,19 @@ def analyze_with_gemini(prompt):
         return f"Error from Gemini: {str(e)}"
 
 def generate_questions(syllabus_text, objectives, question_type, ai_model="openrouter", difficulty_level="moderate", syllabus_topics=""):
-    """Generate question papers based on syllabus and objectives using specified AI model"""
     logger.info(f"Starting question generation with {ai_model} service for {question_type} questions at {difficulty_level} level")
     
-    # Set the AI service for this generation
     os.environ['AI_SERVICE'] = ai_model
     
-    # Extract key topics for smart truncation
     key_topics = extract_key_topics(syllabus_text)
     logger.info(f"Key topics extracted: {len(key_topics)} topics")
     
-    # Smart truncation with priority
     truncated_syllabus = smart_truncate(syllabus_text, 6000, key_topics)
     truncated_objectives = smart_truncate(objectives, 1500)
     truncated_topics = smart_truncate(syllabus_topics, 500) if syllabus_topics else ""
     
     logger.info(f"Text lengths after truncation - Syllabus: {len(truncated_syllabus)}, Objectives: {len(truncated_objectives)}, Topics: {len(truncated_topics)}")
     
-    # Difficulty level specific configurations
     difficulty_configs = {
         "easy": {
             "description": "basic recall and understanding level",
@@ -744,10 +668,8 @@ def generate_questions(syllabus_text, objectives, question_type, ai_model="openr
         }
     }
     
-    # Get difficulty configuration
     difficulty_config = difficulty_configs.get(difficulty_level.lower(), difficulty_configs["moderate"])
     
-    # Question type specific prompts
     question_prompts = {
         "assignment": {
             "description": "comprehensive assignment questions that test deep understanding and application",
@@ -768,7 +690,6 @@ def generate_questions(syllabus_text, objectives, question_type, ai_model="openr
     
     selected_prompt = question_prompts.get(question_type, question_prompts["assignment"])
     
-    # Build topics focus section
     topics_focus = ""
     if truncated_topics:
         topics_focus = f"""
@@ -777,7 +698,6 @@ The questions should particularly emphasize these topics: {truncated_topics}
 While still covering the broader syllabus, give special attention to these specified areas.
 """
     
-    # Enhanced prompt for question generation
     prompt = f"""You are an expert educator and question paper designer with extensive experience in curriculum development.
 
 TASK: Generate a comprehensive question paper based on the provided syllabus and learning objectives.
@@ -830,7 +750,6 @@ IMPORTANT: Every single question in the paper must be at {difficulty_level.upper
 Please generate a complete, ready-to-use question paper that an instructor could immediately use for {difficulty_level} level assessment."""
 
     try:
-        # using diff ai services 
         if ai_model == "openai":
             result = analyze_with_openai(prompt)
         elif ai_model == "openrouter":
