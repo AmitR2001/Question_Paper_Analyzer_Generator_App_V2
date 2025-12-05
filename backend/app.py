@@ -10,15 +10,13 @@ import re
 from datetime import datetime
 
 app = Flask(__name__)
-CORS(app) # allow cross origin requests
+CORS(app)
 
-# MongoDB connection
 MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
 client = MongoClient(MONGO_URI)
 db = client['question_difficulty_app']
 users_collection = db['users']
 
-# setup logging to file and console
 os.makedirs("logs", exist_ok=True)
 log_filename = f"logs/app.log"
 
@@ -27,7 +25,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler(log_filename),
-        logging.StreamHandler() # also log to terminal
+        logging.StreamHandler()
     ]
 )
 
@@ -44,17 +42,14 @@ def login():
         username = data['username'].strip()
         password = data['password']
         
-        # Find user in database by username
         user = users_collection.find_one({'username': username})
         
         if not user:
             return jsonify({'message': 'Invalid username or password'}), 401
         
-        # Check password
         if not check_password_hash(user['password'], password):
             return jsonify({'message': 'Invalid username or password'}), 401
         
-        # Return success response
         return jsonify({
             'message': 'Login successful',
             'user': {
@@ -83,12 +78,10 @@ def register_user():
     try:
         data = request.get_json()
         
-        # Extract and validate required fields
         username = data.get('username', '').strip()
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
         
-        # Validation
         errors = []
         
         if not username:
@@ -109,7 +102,6 @@ def register_user():
         if errors:
             return jsonify({'message': '; '.join(errors)}), 400
         
-        # Check if user already exists (by email or username)
         existing_user = users_collection.find_one({
             '$or': [
                 {'email': email},
@@ -123,10 +115,8 @@ def register_user():
             else:
                 return jsonify({'message': 'Username already taken'}), 409
         
-        # Hash password
         hashed_password = generate_password_hash(password)
         
-        # Create user document with only required fields
         user_doc = {
             'username': username,
             'email': email,
@@ -135,7 +125,6 @@ def register_user():
             'isActive': True
         }
         
-        # Insert user into database
         result = users_collection.insert_one(user_doc)
         
         if result.inserted_id:
@@ -155,7 +144,6 @@ def register_user():
 def analyze():
     logger.info("Received analysis request")
     
-    # check required files in request
     if 'syllabus' not in request.files or 'question_pdf' not in request.files:
         logger.error("Missing syllabus or question file in request")
         return jsonify({"error": "Missing syllabus or question file"}), 400
@@ -163,14 +151,12 @@ def analyze():
     syllabus_file = request.files['syllabus']
     question_file = request.files['question_pdf']
     objectives = request.form.get("objectives", "")
-    ai_model = request.form.get("ai_model", "gemini")  # default to Gemini Pro
+    ai_model = request.form.get("ai_model", "gemini")
     
-    # set ai service env var for ai_logic module
     os.environ['AI_SERVICE'] = ai_model
 
     logger.info(f"Processing files: syllabus={syllabus_file.filename}, question={question_file.filename}, ai_model={ai_model}")
 
-    # save uploaded files to temp folder
     os.makedirs("tmp", exist_ok=True)
     syllabus_path = f"tmp/{syllabus_file.filename}"
     question_path = f"tmp/{question_file.filename}"
@@ -180,20 +166,16 @@ def analyze():
     logger.info("Files saved successfully, extracting text...")
 
     try:
-        # extract text from pdf files
         syllabus_text = extract_text(syllabus_path)
         question_text = extract_text(question_path)
         logger.info("Text extraction completed")
 
-        # run ai analysis
         result = analyze_question_paper(syllabus_text, objectives, question_text)
         logger.info("Analysis completed successfully")
         
-        # handle both old string format and new dict format
         if isinstance(result, dict):
             return jsonify(result)
         else:
-            # legacy format - just return the analysis text
             return jsonify({"result": result})
     
     except Exception as e:
@@ -203,9 +185,9 @@ def analyze():
 @app.route('/api/users', methods=['GET'])
 def get_users():
     try:
-        users = list(users_collection.find({}, {'password': 0}))  # Exclude password field
+        users = list(users_collection.find({}, {'password': 0}))
         for user in users:
-            user['_id'] = str(user['_id'])  # Convert ObjectId to string
+            user['_id'] = str(user['_id'])
         return jsonify(users), 200
     except Exception as e:
         logger.error(f"Error in get_users: {str(e)}")
@@ -225,12 +207,11 @@ def generate():
 
     syllabus_file = request.files['syllabus']
     objectives = request.form.get("objectives", "")
-    syllabus_topics = request.form.get("syllabus_topics", "")  # new parameter
+    syllabus_topics = request.form.get("syllabus_topics", "")
     question_type = request.form.get("question_type", "assignment")
-    difficulty_level = request.form.get("difficulty_level", "moderate")  # new parameter
-    ai_model = request.form.get("ai_model", "gemini")  # default to Gemini Pro for generation
+    difficulty_level = request.form.get("difficulty_level", "moderate")
+    ai_model = request.form.get("ai_model", "gemini")
     
-    # set ai service for generation
     os.environ['AI_SERVICE'] = ai_model
 
     logger.info(f"Processing generation: syllabus={syllabus_file.filename}, type={question_type}, difficulty={difficulty_level}, model={ai_model}")
@@ -247,7 +228,6 @@ def generate():
         syllabus_text = extract_text(syllabus_path)
         logger.info("Text extraction completed")
 
-        # generate questions using ai with new parameters
         result = generate_questions(syllabus_text, objectives, question_type, ai_model, difficulty_level, syllabus_topics)
         logger.info("Question generation completed successfully")
         
